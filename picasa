@@ -4,6 +4,24 @@ logError() {
 	echo "$@" >&2
 }
 
+getFinalTargetPath() {
+	local targetFile=$1
+
+	while [[ -L $targetFile ]];do
+		local next=$(readlink "$targetFile")
+		if [[ ${next:0:1} = '/' ]];then
+			targetFile=$next
+		else
+			targetFile=${targetFile%/*}/${next}
+		fi
+	done
+
+	echo "$targetFile"
+}
+
+ProgramPath=$(getFinalTargetPath $0)
+cd ${ProgramPath%/*}
+
 # Auth token header is possible instead of Authorization HTTP Header
 # ?oauth_token=${ACCESS_TOKEN}
 ACCESS_TOKEN=$(src/getaccesstoken.js)
