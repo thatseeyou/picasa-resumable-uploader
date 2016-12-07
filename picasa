@@ -1,0 +1,786 @@
+#!/bin/bash
+
+logError() {
+	echo "$@" >&2
+}
+
+# Auth token header is possible instead of Authorization HTTP Header
+# ?oauth_token=${ACCESS_TOKEN}
+ACCESS_TOKEN=$(src/getaccesstoken.js)
+if [[ $? -ne 0 ]];then
+	logError "authenticaton fail"
+	exit 1
+fi
+
+RspHeaderFile=$(mktemp)
+RspBodyFile=$(mktemp)
+
+cleanup() {
+    #echo "cleanup...."
+    #echo "rm ${RspHeaderFile}"
+    #echo "rm ${RspBodyFile}"
+    rm ${RspHeaderFile}
+    rm ${RspBodyFile}
+}
+
+trap -- 'cleanup' EXIT
+
+# http is not supported any more.
+BASE='https://picasaweb.google.com/data'
+# api | base
+PROJECTION='/api'
+
+Qjson='alt=json'
+Qpretty='prettyprint=true'
+
+#
+# gphoto:id gphoto:numphots published gphoto:timestamp title link
+albumFeedXSL=$'<?xml version="1.0" encoding="utf-8"?>
+<!-- XML to space delimited file -->
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://www.w3.org/2005/Atom" xmlns:gphoto="http://schemas.google.com/photos/2007">
+<xsl:output method="text" indent="no"/>
+<xsl:strip-space elements="*"/>
+<xsl:template match="/"><xsl:apply-templates select="/f:feed/f:entry"/></xsl:template>
+<xsl:template match="f:entry">
+	<xsl:value-of select="./gphoto:id"/>
+		<xsl:text>&#09;</xsl:text>
+	<xsl:value-of select="./gphoto:numphotos"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:published"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./gphoto:timestamp"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:title"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:link[@rel=\'edit\']/@href"/>
+		<xsl:text>&#10;</xsl:text>
+</xsl:template>
+</xsl:stylesheet>'
+
+# gphoto:id gphoto:albumid published gphoto:timestamp title gphoto:videostatus link
+photoFeedXSL=$'<?xml version="1.0" encoding="utf-8"?>
+<!-- XML to space delimited file -->
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://www.w3.org/2005/Atom" xmlns:gphoto="http://schemas.google.com/photos/2007">
+<xsl:output method="text" indent="no"/>
+<xsl:strip-space elements="*"/>
+<xsl:template match="/"><xsl:apply-templates select="/f:feed/f:entry"/></xsl:template>
+<xsl:template match="f:entry">
+	<xsl:value-of select="./gphoto:id"/>
+		<xsl:text>&#09;</xsl:text>
+	<xsl:value-of select="./gphoto:albumid"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:published"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./gphoto:timestamp"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:title"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./gphoto:size"/>
+		<xsl:text>&#09;</xsl:text>
+	<xsl:if test="./gphoto:videostatus">
+		<xsl:value-of select="./gphoto:videostatus"/>
+	</xsl:if>
+	<xsl:if test="not(./gphoto:videostatus)">
+		<xsl:text>N/A</xsl:text>
+	</xsl:if>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:link[@rel=\'edit\']/@href"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:link[@rel=\'edit-media\']/@href"/>
+		<xsl:text>&#10;</xsl:text>
+</xsl:template>
+</xsl:stylesheet>'
+
+# gphoto:id gphoto:albumid published gphoto:timestamp title gphoto:size gphoto:videostatus link edit-media
+photoEntryXSL=$'<?xml version="1.0" encoding="utf-8"?>
+<!-- XML to space delimited file -->
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://www.w3.org/2005/Atom" xmlns:gphoto="http://schemas.google.com/photos/2007">
+<xsl:output method="text" indent="no"/>
+<xsl:strip-space elements="*"/>
+<xsl:template match="/"><xsl:apply-templates select="/f:entry"/></xsl:template>
+<xsl:template match="f:entry">
+	<xsl:value-of select="./gphoto:id"/>
+		<xsl:text>&#09;</xsl:text>
+	<xsl:value-of select="./gphoto:albumid"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:published"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./gphoto:timestamp"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:title"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./gphoto:size"/>
+		<xsl:text>&#09;</xsl:text>
+	<xsl:if test="./gphoto:videostatus">
+		<xsl:value-of select="./gphoto:videostatus"/>
+	</xsl:if>
+	<xsl:if test="not(./gphoto:videostatus)">
+		<xsl:text>N/A</xsl:text>
+	</xsl:if>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:link[@rel=\'edit\']/@href"/>
+		<xsl:text>&#09;</xsl:text>
+    <xsl:value-of select="./f:link[@rel=\'edit-media\']/@href"/>
+		<xsl:text>&#10;</xsl:text>
+</xsl:template>
+</xsl:stylesheet>'
+
+# edit-media
+photoEntryMediaXSL=$'<?xml version="1.0" encoding="utf-8"?>
+<!-- XML to space delimited file -->
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://www.w3.org/2005/Atom" xmlns:gphoto="http://schemas.google.com/photos/2007">
+<xsl:output method="text" indent="no"/>
+<xsl:strip-space elements="*"/>
+<xsl:template match="/"><xsl:apply-templates select="/f:entry"/></xsl:template>
+<xsl:template match="f:entry">
+    <xsl:value-of select="./f:link[@rel=\'edit-media\']/@href"/>
+		<xsl:text>&#10;</xsl:text>
+</xsl:template>
+</xsl:stylesheet>'
+
+rspStatusCode() {
+	local oldIFS="$IFS"
+	IFS=$' \t\n'
+    read -d $'\r' -r version code msg <${RspHeaderFile}
+    echo "${version} ${code} ${msg}"
+	IFS="$oldIFS"
+}
+
+rspHeaderValue() {
+    local key=$1
+
+	local oldIFS="$IFS"
+	IFS=$' \t\n'
+
+    while read -r -d $'\r' k v;do
+        if [[ ${key}: = $k ]];then
+            echo "$v"
+			IFS="$oldIFS"
+            return 0
+        fi
+    done <${RspHeaderFile}
+
+	IFS="$oldIFS"
+	return 1
+}
+
+appendQueryString() {
+	local url=$1
+	local queryString=$2
+
+	if [[ $url != ${url%\?*} ]];then
+		echo "${url}&${queryString}"
+	else
+		echo "${url}?${queryString}"
+	fi
+}
+
+mimeTypeFromFilename() {
+	local filepath=$1
+
+	local ext=$(echo ${filepath##*.} | tr [A-Z] [a-z])
+	case $ext in
+		jpg) echo "image/jpeg" ;;
+		png) echo "image/png" ;;
+		gif) echo "image/gif" ;;
+		bmp) echo "image/bmp" ;;
+		3gpp) echo "video/3gpp" ;;
+		avi) echo "video/avi" ;;
+		mov) echo "video/quicktime" ;;
+		mp4) echo "video/mp4" ;;
+		asf) echo "video/x-ms-asf" ;;
+		wmv) echo "video/x-ms-wmv" ;;
+		#mpg|mpeg) return "video/mpeg" ;;
+		#mpeg4) return "video/mpeg4" ;;
+		#msv) return "video/msvideo" ;;
+		#mvi) "video/x-msvideo" ;;
+		*) return 1 ;;
+	esac
+
+	return 0
+}
+
+sizeOfFile() {
+	local filepath=$1
+	local filestat=( $(ls -L -l $filepath) )
+
+	echo ${filestat[4]}
+
+	return $?
+}
+
+listAlbumsXML () {
+	local isRaw=$2
+	local albumName=$1
+	local collectionType='/feed'
+	local context='/user/default'
+	local entryFilter="[link/@rel='edit']"
+	[[ -z $albumName ]] || entryFilter="[title='${albumName}' and link/@rel='edit']"
+
+	if [[ $isRaw = '--raw-xml' ]];then
+		local Qfields=${albumName:+"fields=entry${entryFilter}"}
+		local filterOptions=('--data-urlencode' "$Qfields")
+		[[ -z $Qfields ]] && filterOptions=() 
+	else
+		local Qfields="fields=id,openSearch:totalResults,entry${entryFilter}(@gd:etag,id,title,published,updated,gphoto:id,gphoto:timestamp,gphoto:numphotos,link[@rel='edit'])"
+		local filterOptions=('--data-urlencode' "$Qfields")
+	fi
+	local URL=${BASE}${collectionType}${PROJECTION}${context}
+	
+	# To send GET with urlencoded query string use below options together
+	# --get --date-urlencode
+	
+	"${cURL[@]}" \
+		--get \
+		--data-urlencode "${Qpretty}" \
+		"${filterOptions[@]}" \
+		"${URL}"
+}
+
+listAlbums() {
+	listAlbumsXML "$@" |
+	xsltproc <(cat <<<"$albumFeedXSL") - | sort -t $'\t' -k 5 -k 2nr -k 3
+}
+
+numAlbums() {
+	local albumName=$1
+
+	local _numOfAlbums=0
+	while read -r line;do
+		let _numOfAlbums+=1
+	done < <(listAlbums "${albumName}")
+
+	echo $_numOfAlbums
+}
+
+#
+# Delete albums interactively
+# Usage:
+#     deleteAlbums [albumName]
+#     if albumName is null, delete all albums
+deleteAlbums() {
+	local albumName=$1
+
+	# outer read from fd 3
+	# inner read from fd 0 (stdin)
+	exec 3< <(listAlbums "${albumName}")  
+	IFS=$'\t'
+	while read -r -u 3 id numphotos published timestamp title link _; do
+		read -r -n 1 -s -p "Are you sure to delete '$title'(num of photos = $numphotos) ? (y/N/q) " decision
+		if [[ $decision = 'q' ]];then
+			echo "Quit"
+			exit 0
+		elif [[ $decision != 'y' ]];then
+			echo "No"
+			continue
+		fi
+		echo "Yes"
+		
+		"${cURL[@]}" \
+			--header 'If-Match: *' \
+			--request DELETE \
+			"${link}" 
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+}
+
+createAlbum() {
+	local albumName=$1
+	local summary=$2
+	local collectionType='/feed'
+	local context='/user/default'
+	local URL=${BASE}${collectionType}${PROJECTION}${context}
+
+	local now="$(date +%s)000"
+
+	if [[ -z $albumName ]];then
+		echo "No album name."
+		return 1
+	fi
+
+	if [[ $(numAlbums "${albumName}") -gt 0 ]];then
+		echo "${albumName} already exist."
+		return 1
+	fi
+
+
+	# optional curl options 
+	# --trace-ascii - \
+	"${cURL[@]}" \
+		--header 'Content-Type: application/atom+xml' \
+		--data-binary '@-' \
+		"${URL}?prettyprint=true" <<-EOF
+	<entry xmlns='http://www.w3.org/2005/Atom'
+		xmlns:media='http://search.yahoo.com/mrss/'
+		xmlns:gphoto='http://schemas.google.com/photos/2007'>
+		<title type='text'>${albumName}</title>
+		<summary type='text'>${summary}</summary>
+		<gphoto:access>protected</gphoto:access>
+		<gphoto:timestamp>${now}</gphoto:timestamp>
+		<category scheme='http://schemas.google.com/g/2005#kind' term='http://schemas.google.com/photos/2007#album'></category>
+	</entry>
+	EOF
+}
+
+# Usage:
+# modifyAlbumProperty 2016-10 gphoto:timestamp $(date -u -j -f %FT%T +%s000 2016-10-01T00:00:00)
+# modifyAlbumProperty 2016-10 title "New Title"
+modifyAlbumProperty() {
+	local albumName=$1
+	local element=$2
+	local value=$3
+
+	if [[ -z $value ]];then
+		echo "Missing arguments"
+		return 1
+	fi
+
+	exec 3< <(listAlbums "${albumName}")  
+	IFS=$'\t'
+	local numLoop=0
+	while read -r -u 3 _ _ published timestamp title link _; do
+		local url=$(appendQueryString "$link" "${Qpretty}")
+		"${cURL[@]}" \
+			--request PATCH \
+			--header 'If-Match: *' \
+			--header 'Content-Type: application/xml' \
+			--data-binary '@-' \
+			"${url}" <<-EOF
+			<entry xmlns='http://www.w3.org/2005/Atom' xmlns:gphoto='http://schemas.google.com/photos/2007'>
+				<$element>${value}</$element>
+			</entry>
+			EOF
+		let numLoop+=1
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+
+	if [[ $numLoop -eq 0 ]];then
+		logError "No matching albums found."
+	fi
+}
+
+listPhotosXML () {
+	local albumName=$1
+	local photoName=$2
+	local isRaw=$3
+	local option=$4
+	local collectionType='/feed'
+	local context='/user/default'
+	local entryFilter=${photoName:+"[title='${photoName}']"}
+
+	if [[ $option = 'pending' ]];then
+		if [[ -z $photoName ]];then
+			entryFilter="[gphoto:videostatus='pending']"
+		else
+			entryFilter="[title='${photoName}' and gphoto:videostatus='pending']"
+		fi
+	fi
+
+	if [[ $isRaw = '--raw-xml' ]];then
+		local Qfields=${photoName:+"fields=entry${entryFilter}"}
+		local filterOptions=('--data-urlencode' "$Qfields")
+		[[ -z $Qfields ]] && filterOptions=() 
+	else
+		#local Qfields="fields=id,title,openSearch:totalResults,gphoto:id,gphoto:access,entry${entryFilter}(@gd:etag,title,published,updated,gphoto:albumid,gphoto:id,gphoto:timestamp,gphoto:videostatus,gphoto:access,gphoto:videodownloadurl,gphoto:size,link[@rel='edit'])"
+		local Qfields="fields=id,title,openSearch:totalResults,gphoto:id,gphoto:access,entry${entryFilter}(@gd:etag,title,published,updated,gphoto:albumid,gphoto:id,gphoto:timestamp,gphoto:videostatus,gphoto:access,gphoto:videodownloadurl,gphoto:size,link)"
+		local filterOptions=('--data-urlencode' "$Qfields")
+	fi
+
+	if [[ -z $albumName ]];then
+		echo "Missing albumName"
+		return 1
+	fi
+
+	if [[ $albumName = '*' ]];then
+		local URL=${BASE}${collectionType}${PROJECTION}${context}?kind=photo
+		"${cURL[@]}" \
+			--get \
+			--data-urlencode "${Qpretty}" \
+			"${URL}"
+	else
+		exec 3< <(listAlbums "${albumName}")  
+		IFS=$'\t'
+		while read -r -u 3 albumId numphotos published timestamp title link _; do
+			local URL=${BASE}${collectionType}${PROJECTION}${context}/albumid/${albumId}
+			"${cURL[@]}" \
+				--get \
+				--data-urlencode "${Qpretty}" \
+				"${filterOptions[@]}" \
+				"${URL}"
+		done
+		IFS=$' \t\n'
+		exec 3<&-
+	fi
+}
+
+listPhotos() {
+	if [[ -z $1 ]];then
+		echo "Missing albumName"
+		return 1
+	fi
+
+	listPhotosXML "$@" |
+	xsltproc <(cat <<<"$photoFeedXSL") - | sort -t $'\t' -k 5 -k 3
+}
+
+#
+# Delete photos interactively
+# Usage:
+#     deletePhotos [albumName]
+#     if photoName is null, delete all photos
+deletePhotos() {
+	local albumName=$1
+	local photoName=$2
+	local option=$3
+
+	if [[ -z $albumName ]];then
+		echo "Missing albumName"
+		return 1
+	fi
+
+	# outer read from fd 3
+	# inner read from fd 0 (stdin)
+	exec 3< <(listPhotos "${albumName}" "${photoName}" --xml ${option})  
+	IFS=$'\t'
+	while read -r -u 3 id albumid published timestamp title size videostatus link _; do
+		read -r -n 1 -s -p "Are you sure to delete '$title'(video status = $videostatus) ? (y/N/q) " decision
+		if [[ $decision = 'q' ]];then
+			echo "Quit"
+			exit 0
+		elif [[ $decision != 'y' ]];then
+			echo "No"
+			continue
+		fi
+		echo "Yes"
+		
+		"${cURL[@]}" \
+			--header 'If-Match: *' \
+			--request DELETE \
+			"${link}" 
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+}
+
+# Usage:
+# modifyPhotoProperty 2016-10 '2016-10-02 111234.mp4' gphoto:timestamp $(date -u -j -f %FT%T +%s000 2016-10-01T00:00:00)
+# modifyPhotoProperty 2016-10 '2016-10-02 111234.mp4' title "New Title"
+modifyPhotoProperty() {
+	local albumName=$1
+	local photoName=$2
+	local element=$3
+	local value=$4
+
+	if [[ -z $value ]];then
+		echo "Missing arguments"
+		return 1
+	fi
+
+	exec 3< <(listPhotos "${albumName}" "${photoName}")  
+	IFS=$'\t'
+	local numLoop=0
+	while read -r -u 3 id albumid published timestamp title size videostatus link _; do
+		local url=$(appendQueryString "$link" "${Qpretty}")
+		"${cURL[@]}" \
+			--request PATCH \
+			--header 'If-Match: *' \
+			--header 'Content-Type: application/xml' \
+			--data-binary '@-' \
+			"${url}" <<-EOF | xsltproc <(cat <<<"$photoEntryXSL") - | sort -t $'\t' -k 5r -k 3
+			<entry xmlns='http://www.w3.org/2005/Atom' xmlns:gphoto='http://schemas.google.com/photos/2007'>
+				<$element>${value}</$element>
+			</entry>
+			EOF
+		let numLoop+=1
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+
+	if [[ $numLoop -eq 0 ]];then
+		logError "No matching files found."
+	fi
+}
+
+postPhoto() {
+	local albumName=$1
+	local filepath=$2
+	local collectionType='/feed'
+	local context='/user/default'
+
+	exec 3< <(listAlbums "${albumName}")  
+	IFS=$'\t'
+	while read -r -u 3 albumId numphotos published timestamp title link; do
+		local URL=${BASE}${collectionType}${PROJECTION}${context}/albumid/${albumId}
+			#--header 'Expect:' \
+		URL=$(appendQueryString "$URL" "${Qpretty}")
+		"${cURL[@]}" \
+			--request POST \
+			--header 'Content-Type: multipart/related' \
+			--form "metadata=@-;type=application/atom+xml" \
+			--form "data=@${filepath};type=$(mimeTypeFromFilename "${filepath}")" \
+			"${URL}" <<-EOF
+			<entry xmlns='http://www.w3.org/2005/Atom' xmlns:gphoto='http://schemas.google.com/photos/2007'>
+			<title>${filepath##*/}</title>
+			<summary></summary>
+			<category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/photos/2007#photo"/>
+			</entry>
+			EOF
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+}
+
+# ref: https://developers.google.com/gdata/docs/resumable_upload
+resumableUploadVideo() {
+	local albumName=$1
+	local filepath=$2
+	local collectionType='/feed'
+	local context='/user/default'
+
+	# STEP1 : Get Upload URI
+	exec 3< <(listAlbums "${albumName}")  
+	IFS=$'\t'
+	while read -r -u 3 albumId numphotos published timestamp title link; do
+		local URL=${BASE}/upload/resumable/media/create-session${collectionType}${PROJECTION}${context}/albumid/${albumId}
+		local filename="${filepath##*/}"
+		IFS=$' \t\n'
+
+		"${cURL[@]}" \
+			--dump-header "${RspHeaderFile}" \
+			--request POST \
+			--header 'Content-Type: application/atom+xml; charset=utf-8' \
+			--header "X-Upload-Content-Length: $(sizeOfFile "${filepath}")" \
+			--header "X-Upload-Content-Type: $(mimeTypeFromFilename "${filepath}")" \
+			--header "Slug: ${filename}" \
+			--data-binary '@-' \
+			"${URL}" <<-EOF
+			<?xml version="1.0" encoding="UTF-8"?>
+			<entry xmlns="http://www.w3.org/2005/Atom" xmlns:gphoto="http://schemas.google.com/photos/2007">
+			<category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/photos/2007#photo"/>
+			<title>${filename}</title>
+			<gphoto:timestamp>1475517389000</gphoto:timestamp>
+			</entry>
+			EOF
+			#<gphoto:rotation>90</gphoto:rotation>
+
+		local statusCode=( $(rspStatusCode) )
+		if [[ ${statusCode[1]} != 200 ]];then
+			logError "Error: POST resumable : ${statusCode[@]}" 
+			return 1
+		fi
+
+		local uploadLink=$(rspHeaderValue 'Location')
+		if [[ $? -ne 0 ]];then
+			logError "Error: No Location Header" 
+			cat ${RspHeaderFile}
+			return 1
+		fi
+
+		resumablePutVideo "$uploadLink" "$filepath"
+		
+		# upload to first matched album
+		break
+		IFS=$'\t'
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+}
+
+resumablePutVideo() {
+	local URL=$1
+	local filepath=$2
+	local contentType=$(mimeTypeFromFilename "$filepath")
+	local sizeFile=$(sizeOfFile "${filepath}")
+	local sizeBlock=$((1024*1024))
+	local numBlocks=$(( ($sizeFile - 1) / $sizeBlock + 1 ))
+
+	for ((i=0;i<${numBlocks};i++));do
+		local from=$(( i * $sizeBlock ))
+		local to=$(( (i + 1) * $sizeBlock - 1 ))
+		if [[ $to -ge $sizeFile ]];then
+			let to=sizeFile-1
+		fi
+		#local contentLength=$(( $to - $from + 1 ))
+		dd bs=${sizeBlock} if="${filepath}" skip=$i count=1 2>/dev/null |
+		"${cURL2Upload[@]}" \
+			--dump-header "${RspHeaderFile}" \
+			--request PUT \
+			--header "Expect:" \
+			--header "Content-Type: ${contentType}" \
+			--header "Content-Range: bytes ${from}-${to}/${sizeFile}" \
+			--data-binary '@-' \
+			"${URL}" >$RspBodyFile
+
+		local statusCode=( $(rspStatusCode) )
+		if [[ ${statusCode[1]} == 308 ]];then
+			local rspRange=$(rspHeaderValue 'Range')
+			if [[ $? -ne 0 ]];then
+				logError "Error: Server response does not include Range header. Something wrong." 
+				return 1
+			fi
+			if [[ $rspRange != "bytes=0-${to}" ]];then
+				logError "Error: Unexpected server response; Range: $rspRange" 
+				return 1
+			fi
+			logError "Put[$i] did Range: $rspRange" 
+
+			#local rspLocation=$(rspHeaderValue 'Location')
+			#if [[ $? -eq 0 ]];then
+				#echo "Location changed to $rspLocation"
+				#URL=${rspLocation}
+			#fi
+		elif [[ ${statusCode[1]} == 201 ]];then
+			logError "Put Done." 
+			cat $RspBodyFile |
+			xsltproc <(cat <<<"$photoEntryXSL") - | sort -t $'\t' -k 5r -k 3
+		else
+			logError "Error: Unexpected server response; ${statusCode[@]}" 
+			return 1
+		fi
+	done
+}
+
+uploadPhotoDirectIsNotSupported() {
+	local albumName=$1
+	local filepath=$2
+	local collectionType='/feed'
+	local context='/user/default'
+
+	exec 3< <(listAlbums "${albumName}")  
+	IFS=$'\t'
+	while read -r -u 3 albumId _ published timestamp title link; do
+		local URL=${BASE}${collectionType}${PROJECTION}${context}/albumid/${albumId}
+		URL=$(appendQueryString "$URL" "${Qpretty}")
+		"${cURL[@]}" \
+			--request POST \
+			--header 'Content-Type: video/mp4' \
+			--header "Slug: ${filepath##*/}" \
+			--data-binary "@${filepath}" \
+			"${URL}"
+	done
+	IFS=$' \t\n'
+	exec 3<&-
+}
+
+usageAndExit() {
+	# replacement of cat <<-EOF
+	read -d '' message  <<-EOF
+	NOTICE: The order of options matters.
+	picasa [-v] list album [--tab | --xml | --raw-xml] [album name]
+	picasa [-v] create album <album name> [summary] 
+	picasa [-v] delete album [album name]
+	picasa [-v] modify album <album name> <property key> <property value>
+	                         2016-10 title "New Title"
+	picasa [-v] list photo [--tab | --xml | --raw-xml] <album name> [photo name]
+	picasa [-v] delete photo <album name> [photo name]
+	picasa [-v] delete pending
+	picasa [-v] modify photo <album name> <photo name> <property key> <property value>
+	                         2016-10 '2016-10-02 111234.mp4' title "New Title"
+	                         2016-10 '2016-10-02 111234.mp4' summary "New summary"
+	picasa [-v] upload photo <album name> <file path>
+	EOF
+
+	echo "$message"
+
+	#2016-10 gphoto:timestamp \$(date -u -j -f %FT%T +%s000 2016-10-01T00:00:00)
+
+	exit 1
+}
+
+main() {
+	cURL=(curl --silent --show-error --header "GData-Version: 2.0" --header "Authorization: Bearer ${ACCESS_TOKEN}")
+	cURL2Upload=(curl --silent --show-error)
+
+	if [[ $1 = '-v' ]];then
+		cURL=(curl -v --header "GData-Version: 2.0" --header "Authorization: Bearer ${ACCESS_TOKEN}")
+		cURL2Upload=(curl -v)
+		shift
+	fi
+
+	command=$1
+	shift
+	if [[ -z $command ]];then
+		usageAndExit
+	fi
+
+	kind=$1
+	shift
+	if [[ -z $kind ]];then
+		usageAndExit
+	fi
+
+	case "$kind:$command" in
+		album:list)
+			if [[ $1 == '--xml' ]];then
+				listAlbumsXML "$2" "$1"
+			elif [[ $1 == '--raw-xml' ]];then
+				listAlbumsXML "$2" "$1"
+			elif [[ $1 == '--tab' ]];then
+				listAlbums "$2"
+			else
+				listAlbums "$1" | cut -f 5
+			fi
+			;;
+
+		album:create)
+			createAlbum "$1" "$2"
+			;;
+
+		album:delete)
+			deleteAlbums "$1"
+			;;
+
+		album:modify)
+			modifyAlbumProperty "$1" "$2" "$3"
+			;;
+
+		photo:list)
+			if [[ $1 == '--xml' ]];then
+				listPhotosXML "$2" "$3"
+			elif [[ $1 == '--raw-xml' ]];then
+				listPhotosXML "$2" "$3" "$1"
+			elif [[ $1 == '--tab' ]];then
+				listPhotos "$2" "$3"
+			else
+				listPhotos "$1" "$2" | cut -f 5
+			fi
+			;;
+
+		photo:delete)
+			deletePhotos "$1" "$2"
+			;;
+
+		pending:delete)
+			deletePhotos "$1" "$2" pending
+			;;
+
+		photo:modify)
+			modifyPhotoProperty "$1" "$2" "$3" "$4"
+			;;
+
+		photo:upload)
+			local mimeType=$(mimeTypeFromFilename $2)
+			local meditType=${mimeType%%/*}
+			if [[ $mediaType = 'video' ]];then
+				resumableUploadVideo "$1" "$2"
+			elif [[ $mediaType = 'image' ]];then
+				postPhoto "$1" "$2"
+			else
+				logError "Unknown content type. Content type is inferred form file extension."
+				return 1
+			fi
+			;;
+
+		*)
+			usageAndExit
+			;;
+
+	esac
+
+	return 0
+}
+
+main "$@"
+exit $?

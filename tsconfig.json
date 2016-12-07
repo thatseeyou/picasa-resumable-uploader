@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "noImplicitAny": true,
+    "noImplicitUseStrict": false,
+    "removeComments": false,
+    "listFiles": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": [
+        "*",
+        "types/*"
+      ]
+    },
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "compileOnSave": true,
+  "buildOnSave": false,
+  "atom": {
+    "rewriteTsconfig": false
+  }
+}

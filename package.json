@@ -1,0 +1,23 @@
+{
+  "name": "googlephotos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "accesstoken": "node src/getaccesstoken.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/minimist": "^1.1.29",
+    "@types/node": "^6.0.46",
+    "@types/request": "0.0.33",
+    "google-auth-library": "^0.9.9",
+    "googleapis": "^14.1.0",
+    "minimist": "^1.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^2.0.10"
+  }
+}
