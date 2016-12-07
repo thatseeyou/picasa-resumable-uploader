@@ -1,0 +1,98 @@
+#!/bin/bash
+# must set outside function
+shopt -s extglob
+shopt -s nullglob
+
+getFinalTargetPath() {
+	local targetFile=$1
+
+	while [[ -L $targetFile ]];do
+		local next=$(readlink "$targetFile")
+		if [[ ${next:0:1} = '/' ]];then
+			targetFile=$next
+		else
+			targetFile=${targetFile%/*}/${next}
+		fi
+	done
+
+	echo "$targetFile"
+}
+
+which picasa >/dev/null
+if [[ $? -eq 0 ]];then
+	PICASA=picasa
+else
+	programPath=$(getFinalTargetPath $0)
+	candidate="${programPath%/*}/picasa"
+	which "${candidate}" >/dev/null
+	if [[ $? -eq 0 ]];then
+		PICASA="${candidate}"
+	else
+		logError "Can't find picasa"
+		exit 1
+	fi
+fi 
+
+logError() {
+	echo "$@" >&2
+}
+
+syncUpload() {
+	local srcDir=$1
+
+	if [[ ! -e ${srcDir} ]];then
+		logError "${srcDir} does not exist."
+		return 1
+	fi
+	if [[ ! -d ${srcDir} ]];then
+		logError "${srcDir} is not directory."
+		return 1
+	fi
+
+	local albumName=${srcDir##*/}
+	uploadedFiles=$("$PICASA" list photo "${albumName}")
+	if [[ $? -ne 0 ]];then
+		echo "create not existing album ${albumName}"
+		"$PICASA" create album "${albumName}"
+	fi
+
+	for srcPath in "${srcDir}"/*.@(mp4|mov|asf|wmv|avi|3gpp|jpg|png|gif|bmp);do
+		# check the existence of video file to picasa
+		local bAlreadyExist=0
+		while read picasaFile;do
+			# allow url encoded filename ( ' ' -> %20 )
+			local decodedPicasaFile=${picasaFile//%20/ }
+			local srcFile=${srcPath##*/}
+			local decodedSrcFile=${srcFile//%20/ }
+
+			if [[ $decodedSrcFile != $srcFile ]];then
+				logError "normalize source: $srcFile -> $decodedSrcFile"
+			fi
+			if [[ $decodedSrcFile = $decodedPicasaFile ]];then
+				bAlreadyExist=1
+				if [[ $decodedPicasaFile != $picasaFile ]];then
+					logError "normalize picasa: $picasaFile -> $decodedPicasaFile"
+				fi
+				break
+			fi
+		done <<< "${uploadedFiles}"
+
+		if [[ $bAlreadyExist -eq 1 ]];then
+			logError "Already uploaded $srcPath"
+			continue
+		fi
+
+		echo "Upload \"${albumName}\" / \"${srcPath}\""
+		"$PICASA" upload photo "${albumName}" "${srcPath}"
+	done
+}
+
+srcDir=$1
+if [[ -z $srcDir ]];then
+	logError "Usage: ${0##*/} <directory>"
+	logError "   ex) ${0##*/} videos/2016/2016-10"
+
+	exit 1
+fi
+
+syncUpload "${srcDir}"
