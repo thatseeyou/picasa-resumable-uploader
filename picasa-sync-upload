@@ -52,7 +52,7 @@ syncUpload() {
 	local albumName=${srcDir##*/}
 	uploadedFiles=$("$PICASA" list photo "${albumName}")
 	if [[ $? -ne 0 ]];then
-		echo "create not existing album ${albumName}"
+		echo "create not existing album \"${albumName}\""
 		"$PICASA" create album "${albumName}"
 	fi
 
@@ -66,19 +66,19 @@ syncUpload() {
 			local decodedSrcFile=${srcFile//%20/ }
 
 			if [[ $decodedSrcFile != $srcFile ]];then
-				logError "normalize source: $srcFile -> $decodedSrcFile"
+				logError "normalize source: \"$srcFile\" -> \"$decodedSrcFile\""
 			fi
 			if [[ $decodedSrcFile = $decodedPicasaFile ]];then
 				bAlreadyExist=1
 				if [[ $decodedPicasaFile != $picasaFile ]];then
-					logError "normalize picasa: $picasaFile -> $decodedPicasaFile"
+					logError "normalize picasa: \"$picasaFile\" -> \"$decodedPicasaFile\""
 				fi
 				break
 			fi
 		done <<< "${uploadedFiles}"
 
 		if [[ $bAlreadyExist -eq 1 ]];then
-			logError "Already uploaded $srcPath"
+			logError "Already uploaded \"$srcPath\""
 			continue
 		fi
 
