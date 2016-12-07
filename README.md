@@ -28,6 +28,8 @@ I write the code to upload my video to google photos.
 $ sudo apt-get install nodejs
 $ sudo apt-get install curl
 $ sudo apt-get install xsltproc
+# if you can not run node
+$ sudo update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
 ```
 
 * macOS : already installed
@@ -40,7 +42,8 @@ $ brew install node
 $ git clone 'git@github.com:thatseeyou/picasa-resumable-uploader.git'
 $ cd picasa-resulable-uploader
 $ npm Install
-$ cp xxx client_secret.json (refer next section)
+$ mkdir ~/.credentials
+$ cp <downloaded client secret file> ~/.credentials/picasa-resumable-uploader_client_secret.json (refer next section)
 $ ./picasa list album
 ```
 

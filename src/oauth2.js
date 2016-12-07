@@ -3,13 +3,13 @@ const fs = require('fs');
 const readline = require('readline');
 const google = require('googleapis');
 // Made in https://console.developers.google.com
-const CLIENT_SECRET_FILE = 'client_secret.json';
 const TOKEN_DIR = (process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE) + '/.credentials/';
 // cache for refresh_token & access_token
 const TOKEN_PATH = TOKEN_DIR + 'picasa-resumable-uploader.json';
+const CLIENT_SECRET_PATH = TOKEN_DIR + 'picasa-resumable-uploader_client_secret.json';
 function readClientSecret() {
     return new Promise(function (resolve, reject) {
-        fs.readFile(CLIENT_SECRET_FILE, 'utf8', function afterReadClientSecret(err, content) {
+        fs.readFile(CLIENT_SECRET_PATH, 'utf8', function afterReadClientSecret(err, content) {
             if (err) {
                 console.error('Error loading client secret file: ' + err);
                 reject(err);
