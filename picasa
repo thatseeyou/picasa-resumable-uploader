@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# default: exit status of last command
+# pipefail: exis status of rightmost error command or all zero
+set -o pipefail
+
 logError() {
 	echo "$@" >&2
 }
@@ -279,6 +283,11 @@ numAlbums() {
 deleteAlbums() {
 	local albumName=$1
 
+	if [[ $(numAlbums "${albumName}") -eq 0 ]];then
+		logError "${albumName} does not exist."
+		return 1
+	fi
+
 	# outer read from fd 3
 	# inner read from fd 0 (stdin)
 	exec 3< <(listAlbums "${albumName}")  
@@ -434,8 +443,15 @@ listPhotosXML () {
 }
 
 listPhotos() {
-	if [[ -z $1 ]];then
-		echo "Missing albumName"
+	local albumName=$1
+
+	if [[ -z $albumName ]];then
+		logError "Missing albumName"
+		return 1
+	fi
+
+	if [[ $(numAlbums "${albumName}") -eq 0 ]];then
+		logError "${albumName} does not exist."
 		return 1
 	fi
 
@@ -483,7 +499,7 @@ deletePhotos() {
 }
 
 # Usage:
-# modifyPhotoProperty 2016-10 '2016-10-02 111234.mp4' gphoto:timestamp $(date -u -j -f %FT%T +%s000 2016-10-01T00:00:00)
+# NOT WORKING: modifyPhotoProperty 2016-10 '2016-10-02 111234.mp4' gphoto:timestamp $(date -u -j -f %FT%T +%s000 2016-10-01T00:00:00)
 # modifyPhotoProperty 2016-10 '2016-10-02 111234.mp4' title "New Title"
 modifyPhotoProperty() {
 	local albumName=$1
@@ -797,7 +813,7 @@ main() {
 
 	esac
 
-	return 0
+	return $?
 }
 
 main "$@"
