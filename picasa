@@ -224,7 +224,7 @@ mimeTypeFromFilename() {
 
 sizeOfFile() {
 	local filepath=$1
-	local filestat=( $(ls -L -l $filepath) )
+	local filestat=( $(ls -L -l "$filepath") )
 
 	echo ${filestat[4]}
 
@@ -795,8 +795,8 @@ main() {
 			;;
 
 		photo:upload)
-			local mimeType=$(mimeTypeFromFilename $2)
-			local meditType=${mimeType%%/*}
+			local mimeType=$(mimeTypeFromFilename "$2")
+			local mediaType=${mimeType%%/*}
 			if [[ $mediaType = 'video' ]];then
 				resumableUploadVideo "$1" "$2"
 			elif [[ $mediaType = 'image' ]];then
