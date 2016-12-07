@@ -44,7 +44,8 @@ $ cd picasa-resulable-uploader
 $ npm Install
 $ mkdir ~/.credentials
 $ cp <downloaded client secret file> ~/.credentials/picasa-resumable-uploader_client_secret.json (refer next section)
-$ ./picasa list album
+# (optional) picasa can run anywhere
+$ ln -s $(pwd)/picasa /usr/local/bin
 ```
 
 ## Get client_secret.json
