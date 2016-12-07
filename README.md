@@ -55,7 +55,7 @@ $ ./picasa list album
 6. Click 'Continue' after setting 'Product Name' like 'picasa uploader'
 7. Click 'Download' and remane downloaded file to client_secret.json
 
-## run
+## Run
 ```bash
 $ ./picasa
 NOTICE: The order of options matters.
