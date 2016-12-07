@@ -32,7 +32,7 @@ $ sudo apt-get install xsltproc
 $ sudo update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
 ```
 
-* macOS : already installed
+* macOS : curl, xsltproc already installed
 ```bash
 $ brew install node
 ```
