@@ -77,3 +77,19 @@ picasa [-v] modify photo <album name> <photo name> <property key> <property valu
 picasa [-v] upload photo <album name> <file path>
 ```
 
+## picasa-sync-upload using picasa
+Sync directory contents to album.
+
+```bash
+$ ./picasa-sync-upload 
+Usage: picasa-sync-upload <directory>
+   ex) picasa-sync-upload videos/2016/2016-10
+```
+
+This can be run anywhere like the following.
+
+```bash
+$ ln -s <installed directory>/picasa-sync-upload /usr/local/bin
+$ picasa-sync-upload
+```
+
