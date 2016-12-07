@@ -658,7 +658,7 @@ resumablePutVideo() {
 				logError "Error: Unexpected server response; Range: $rspRange" 
 				return 1
 			fi
-			logError "Put[$i] did Range: $rspRange" 
+			echo -n -e "\rPut[$((i+1))/${numBlocks}] $rspRange / $sizeFile" >&2
 
 			#local rspLocation=$(rspHeaderValue 'Location')
 			#if [[ $? -eq 0 ]];then
@@ -666,7 +666,7 @@ resumablePutVideo() {
 				#URL=${rspLocation}
 			#fi
 		elif [[ ${statusCode[1]} == 201 ]];then
-			logError "Put Done." 
+			logError $'\n'"Put Done." 
 			cat $RspBodyFile |
 			xsltproc <(cat <<<"$photoEntryXSL") - | sort -t $'\t' -k 5r -k 3
 		else
@@ -709,7 +709,7 @@ usageAndExit() {
 	                         2016-10 title "New Title"
 	picasa [-v] list photo [--tab | --xml | --raw-xml] <album name> [photo name]
 	picasa [-v] delete photo <album name> [photo name]
-	picasa [-v] delete pending
+	picasa [-v] delete pending <album name>
 	picasa [-v] modify photo <album name> <photo name> <property key> <property value>
 	                         2016-10 '2016-10-02 111234.mp4' title "New Title"
 	                         2016-10 '2016-10-02 111234.mp4' summary "New summary"
