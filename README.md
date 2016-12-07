@@ -10,7 +10,8 @@ I write the code to upload my video to google photos.
 - OAuth2 using [google-auth-lirary-nodejs](https://github.com/google/google-auth-library-nodejs)
     - written with typescript
 - Upload video files using [resumable upload protocol](https://developers.google.com/gdata/docs/resumable_upload)
-    - written with bash, curl and xsltproc 
+    - written with bash, curl and xsltproc
+    - To get hidden resumable-post link I hack the working ios app. 
 
 ## Features
 - Support OAuth2
