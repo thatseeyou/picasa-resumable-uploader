@@ -554,7 +554,7 @@ postPhoto() {
 			--header 'Content-Type: multipart/related' \
 			--form "metadata=@-;type=application/atom+xml" \
 			--form "data=@${filepath};type=$(mimeTypeFromFilename "${filepath}")" \
-			"${URL}" <<-EOF
+			"${URL}" <<-EOF | xsltproc <(cat <<<"$photoEntryXSL") - | sort -t $'\t' -k 5r -k 3
 			<entry xmlns='http://www.w3.org/2005/Atom' xmlns:gphoto='http://schemas.google.com/photos/2007'>
 			<title>${filepath##*/}</title>
 			<summary></summary>
