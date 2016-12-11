@@ -56,7 +56,7 @@ syncUpload() {
 		"$PICASA" create album "${albumName}"
 	fi
 
-	for srcPath in "${srcDir}"/*.@(mp4|mov|asf|wmv|avi|3gpp|jpg|png|gif|bmp);do
+	for srcPath in "${srcDir}"/*.@(mp4|m2ts|mts|mov|asf|wmv|avi|3gpp|jpg|png|gif|bmp);do
 		# check the existence of video file to picasa
 		local bAlreadyExist=0
 		while read picasaFile;do

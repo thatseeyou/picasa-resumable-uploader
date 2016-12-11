@@ -209,7 +209,7 @@ mimeTypeFromFilename() {
 		3gpp) echo "video/3gpp" ;;
 		avi) echo "video/avi" ;;
 		mov) echo "video/quicktime" ;;
-		mp4) echo "video/mp4" ;;
+		mp4|m2ts|mts) echo "video/mp4" ;;
 		asf) echo "video/x-ms-asf" ;;
 		wmv) echo "video/x-ms-wmv" ;;
 		#mpg|mpeg) return "video/mpeg" ;;
