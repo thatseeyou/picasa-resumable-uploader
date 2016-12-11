@@ -38,7 +38,8 @@ logError() {
 }
 
 syncUpload() {
-	local srcDir=$1
+	# remove trailing slash
+	local srcDir=${1%/}
 
 	if [[ ! -e ${srcDir} ]];then
 		logError "${srcDir} does not exist."
