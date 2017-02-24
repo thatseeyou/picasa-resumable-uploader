@@ -5,6 +5,7 @@
 
 // Definition file started by dts-gen
 
+/// <reference types="node" />
 import request = require('request');
 import http = require('http');
 import googleAuth = require('google-auth-library');

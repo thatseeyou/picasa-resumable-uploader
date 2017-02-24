@@ -8,11 +8,17 @@
     "noImplicitUseStrict": false,
     "removeComments": false,
     "listFiles": true,
+	"typeRoots": [
+		"node_modules/@types",
+		"types"
+	],
+	"types": [],
     "baseUrl": ".",
     "paths": {
       "*": [
-        "*",
-        "types/*"
+        "node_modules/@types/*",
+        "types/*",
+		"*"
       ]
     },
     "sourceMap": true

@@ -5,6 +5,7 @@
 
 // Definition file started by dts-gen
 
+/// <reference types="node" />
 import http = require('http');
 
 export = google_auth_library;

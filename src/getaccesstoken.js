@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
-const oauth2_1 = require('./oauth2');
+Object.defineProperty(exports, "__esModule", { value: true });
+const oauth2_1 = require("./oauth2");
 // If modifying these scopes, delete your previously saved credentials
 // at ~/.credentials/googlephotos.json
 const SCOPES = [
@@ -16,7 +17,5 @@ oauth2_1.readClientSecret()
     console.log(auth.credentials.access_token);
 }, function reject(reason) {
     console.error(reason);
-
-    process.exit(1);
 });
 //# sourceMappingURL=getaccesstoken.js.map

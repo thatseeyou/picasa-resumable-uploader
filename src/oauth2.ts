@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import * as fs from 'fs';
 import * as readline from 'readline';
 import * as google from 'googleapis';
