@@ -1,4 +1,9 @@
-# Picasa resumable uploader
+# Google published new Photos APIs
+With the new API, I think you can solve the following problems.
+- [Resumable uploads](https://developers.google.com/photos/library/guides/resumable-uploads)
+- [Create albums](https://developers.google.com/photos/library/guides/create-albums)
+
+# Picasa resumable uploader (DEPRECATED)
 I used [googlecl](https://code.google.com/archive/p/googlecl/) and [picasawebsync](https://github.com/leocrawford/picasawebsync) for syncing my photos and videos to Picasa(Google photos).
 
 But they are not working now.
